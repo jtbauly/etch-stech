@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<title>AI Etch A Sketch Robot PRO AI</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet"></script>
+
+
+<style>
+
+body{
+background:#111;
+color:white;
+font-family:Arial;
+text-align:center;
+}
+
+
+#machine{
+
+width:850px;
+margin:auto;
+background:#d00000;
+padding:30px;
+border-radius:30px;
+
+}
+
+
+canvas{
+
+background:#eee;
+border:15px solid #777;
+border-radius:15px;
+
+}
+
+
+button,input{
+
+padding:10px;
+margin:5px;
+font-size:16px;
+
+}
+
+
+button{
+cursor:pointer;
+}
+
+
+#robot{
+
+font-size:45px;
+position:absolute;
+
+}
+
+
+.knobs{
+
+display:flex;
+justify-content:space-between;
+
+}
+
+
+.knob{
+
+width:70px;
+height:70px;
+background:#900;
+border-radius:50%;
+border:8px solid #500;
+
+}
+
+
+</style>
+
+</head>
+
+
+<body>
+
+
+<h1>🤖 AI ETCH A SKETCH ROBOT</h1>
+
+
+<div id="machine">
+
+
+<input 
+type="file"
+id="upload"
+accept="image/*">
+
+
+<br>
+
+
+<button onclick="processImage()">
+🧠 AI PROCESS
+</button>
+
+
+<button onclick="drawImage()">
+✏️ DRAW
+</button>
+
+
+<button onclick="pauseDrawing()">
+⏸ PAUSE
+</button>
+
+
+<button onclick="stopDrawing()">
+⛔ STOP
+</button>
+
+
+<button onclick="clearScreen()">
+🗑 CLEAR
+</button>
+
+
+<button onclick="saveImage()">
+💾 SAVE
+</button>
+
+
+<br>
+
+
+Detail
+
+<input 
+type="range"
+id="detail"
+min="2"
+max="12"
+value="5">
+
+
+Speed
+
+<input
+type="range"
+id="speed"
+min="1"
+max="50"
+value="25">
+
+
+<br><br>
+
+
+<canvas 
+id="board"
+width="700"
+height="450">
+</canvas>
+
+
+<div class="knobs">
+
+<div class="knob" onclick="moveKnob(-5)"></div>
+
+<div class="knob" onclick="moveKnob(5)"></div>
+
+</div>
+
+
+<div id="robot">
+🤖
+</div>
+
+
+<p id="ai">
+AI Loading...
+</p>
+
+
+</div>
+
+
+
+<script>
+
+
+const canvas=document.getElementById("board");
+
+const ctx=canvas.getContext("2d");
+
+
+let model;
+
+let strokes=[];
+
+let paths=[];
+
+let drawing=false;
+
+let paused=false;
+
+let robotX=350;
+
+let robotY=225;
+
+
+
+clearScreen();
+
+
+
+async function loadAI(){
+
+model=
+await mobilenet.load();
+
+
+document.getElementById("ai")
+.innerHTML=
+"AI Ready";
+
+
+}
+
+
+loadAI();
+
+
+
+
+
+function clearScreen(){
+
+ctx.fillStyle="#eee";
+
+ctx.fillRect(
+0,
+0,
+700,
+450
+);
+
+
+}
+
+
+
+
+
+async function processImage(){
+
+
+if(!model){
+
+alert("AI still loading");
+
+return;
+
+}
+
+
+
+let file=
+document.getElementById("upload").files[0];
+
+
+
+if(!file){
+
+alert("Upload image");
+
+return;
+
+}
+
+
+
+let img=new Image();
+
+
+
+img.onload=async function(){
+
+
+
+let result=
+await model.classify(img);
+
+
+
+document.getElementById("ai")
+.innerHTML=
+"AI sees: "+
+result[0].className;
+
+
+
+createDrawing(img);
+
+
+
+}
+
+
+
+img.src=
+URL.createObjectURL(file);
+
+
+}
+
+
+
+
+
+function createDrawing(img){
+
+
+let temp=
+document.createElement("canvas");
+
+
+temp.width=700;
+
+temp.height=450;
+
+
+
+let t=
+temp.getContext("2d");
+
+
+t.drawImage(
+img,
+0,
+0,
+700,
+450
+);
+
+
+
+let data=
+t.getImageData(
+0,
+0,
+700,
+450
+);
+
+
+
+strokes=[];
+
+
+
+let step=
+Number(
+document.getElementById("detail").value
+);
+
+
+
+for(
+let y=2;
+y<448;
+y+=step
+){
+
+
+for(
+let x=2;
+x<698;
+x+=step
+){
+
+
+let i=
+(y*700+x)*4;
+
+
+
+let current=
+(data.data[i]+
+data.data[i+1]+
+data.data[i+2])/3;
+
+
+
+let right=
+(data.data[i+12]+
+data.data[i+13]+
+data.data[i+14])/3;
+
+
+
+let edge=
+Math.abs(
+current-right
+);
+
+
+
+if(edge>35){
+
+
+strokes.push({
+
+x:x,
+y:y
+
+});
+
+
+}
+
+
+}
+
+
+}
+
+
+
+makePaths();
+
+
+clearScreen();
+
+
+
+alert(
+"AI drawing ready!"
+);
+
+
+}
+
+
+
+
+
+
+function makePaths(){
+
+
+paths=[];
+
+
+let current=[];
+
+
+for(let p of strokes){
+
+
+
+if(current.length===0){
+
+current.push(p);
+
+continue;
+
+}
+
+
+
+let last=
+current[current.length-1];
+
+
+let d=
+Math.hypot(
+p.x-last.x,
+p.y-last.y
+);
+
+
+
+if(d<40){
+
+current.push(p);
+
+}
+
+else{
+
+
+if(current.length>2)
+paths.push(current);
+
+
+current=[p];
+
+
+}
+
+
+
+}
+
+
+
+if(current.length>2)
+paths.push(current);
+
+
+}
+
+
+
+
+
+
+
+
+async function drawImage(){
+
+
+if(paths.length===0){
+
+alert("Process image first");
+
+return;
+
+}
+
+
+
+drawing=true;
+
+
+
+ctx.strokeStyle="#111";
+
+ctx.lineWidth=2;
+
+
+
+for(let path of paths){
+
+
+
+for(let p of path){
+
+
+
+while(paused){
+
+await wait(100);
+
+}
+
+
+
+if(!drawing)
+return;
+
+
+
+ctx.beginPath();
+
+
+ctx.moveTo(
+robotX,
+robotY
+);
+
+
+ctx.lineTo(
+p.x,
+p.y
+);
+
+
+ctx.stroke();
+
+
+
+moveRobot(
+p.x,
+p.y
+);
+
+
+
+await wait(
+60-
+Number(
+document.getElementById("speed").value
+)
+);
+
+
+
+}
+
+
+}
+
+
+drawing=false;
+
+
+}
+
+
+
+
+
+
+function moveRobot(x,y){
+
+robotX=x;
+
+robotY=y;
+
+
+document.getElementById("robot")
+.style.transform=
+
+`
+translate(
+${x/8}px,
+${y/8}px
+)
+`;
+
+}
+
+
+
+
+function pauseDrawing(){
+
+paused=!paused;
+
+}
+
+
+
+
+
+function stopDrawing(){
+
+drawing=false;
+
+paused=false;
+
+}
+
+
+
+
+
+function moveKnob(amount){
+
+robotX+=amount;
+
+
+ctx.beginPath();
+
+ctx.moveTo(
+robotX,
+robotY
+);
+
+
+ctx.lineTo(
+robotX+amount,
+robotY
+);
+
+
+ctx.stroke();
+
+
+moveRobot(
+robotX,
+robotY
+);
+
+
+}
+
+
+
+
+
+
+
+function saveImage(){
+
+let a=document.createElement("a");
+
+a.download="AI-Etch-Sketch.png";
+
+a.href=
+canvas.toDataURL();
+
+
+a.click();
+
+
+}
+
+
+
+
+
+function wait(ms){
+
+return new Promise(
+r=>setTimeout(r,ms)
+);
+
+}
+
+
+
+</script>
+
+
+</body>
+
+</html>
