@@ -3,11 +3,10 @@
 
 <head>
 
-<title>AI Etch A Sketch Robot PRO AI</title>
+<title>AI Etch A Sketch Robot</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet"></script>
-
 
 <style>
 
@@ -18,67 +17,51 @@ font-family:Arial;
 text-align:center;
 }
 
-
 #machine{
-
 width:850px;
 margin:auto;
-background:#d00000;
 padding:30px;
+background:#d00000;
 border-radius:30px;
-
+box-shadow:0 0 40px black;
 }
 
-
 canvas{
-
 background:#eee;
 border:15px solid #777;
 border-radius:15px;
-
 }
 
-
 button,input{
-
 padding:10px;
 margin:5px;
 font-size:16px;
-
+border-radius:10px;
 }
-
 
 button{
 cursor:pointer;
 }
 
-
 #robot{
-
 font-size:45px;
 position:absolute;
-
+transition:.05s;
 }
-
 
 .knobs{
-
 display:flex;
 justify-content:space-between;
-
 }
 
-
 .knob{
-
 width:70px;
 height:70px;
 background:#900;
 border-radius:50%;
 border:8px solid #500;
-
+cursor:pointer;
 }
-
 
 </style>
 
@@ -97,60 +80,43 @@ border:8px solid #500;
 <input 
 type="file"
 id="upload"
-accept="image/*">
+accept="image/*"
+onchange="autoProcess()">
 
-
-<br>
-
-
-<button onclick="processImage()">
-🧠 AI PROCESS
-</button>
-
-
-<button onclick="drawImage()">
-✏️ DRAW
-</button>
-
-
-<button onclick="pauseDrawing()">
-⏸ PAUSE
-</button>
-
-
-<button onclick="stopDrawing()">
-⛔ STOP
-</button>
-
-
-<button onclick="clearScreen()">
-🗑 CLEAR
-</button>
-
-
-<button onclick="saveImage()">
-💾 SAVE
-</button>
 
 
 <br>
 
 
-Detail
+<button onclick="drawImage()">✏️ DRAW</button>
 
-<input 
-type="range"
+<button onclick="pauseDrawing()">⏸ PAUSE</button>
+
+<button onclick="stopDrawing()">⛔ STOP</button>
+
+<button onclick="clearScreen()">🗑 CLEAR</button>
+
+<button onclick="saveImage()">💾 SAVE</button>
+
+
+<br>
+
+
+DETAIL
+
+<input
 id="detail"
+type="range"
 min="2"
 max="12"
 value="5">
 
 
-Speed
+SPEED
 
 <input
-type="range"
 id="speed"
+type="range"
 min="1"
 max="50"
 value="25">
@@ -159,7 +125,7 @@ value="25">
 <br><br>
 
 
-<canvas 
+<canvas
 id="board"
 width="700"
 height="450">
@@ -175,17 +141,17 @@ height="450">
 </div>
 
 
-<div id="robot">
-🤖
-</div>
+<div id="robot">🤖</div>
 
 
 <p id="ai">
-AI Loading...
+⚡ Loading AI...
 </p>
 
 
 </div>
+
+
 
 
 
@@ -197,11 +163,11 @@ const canvas=document.getElementById("board");
 const ctx=canvas.getContext("2d");
 
 
-let model;
-
-let strokes=[];
+let model=null;
 
 let paths=[];
+
+let strokes=[];
 
 let drawing=false;
 
@@ -217,16 +183,34 @@ clearScreen();
 
 
 
+
+// LOAD AI IN BACKGROUND
+
 async function loadAI(){
 
+try{
+
 model=
-await mobilenet.load();
+await mobilenet.load({
+
+version:2,
+alpha:.25
+
+});
 
 
-document.getElementById("ai")
-.innerHTML=
-"AI Ready";
+document.getElementById("ai").innerHTML=
+"🤖 AI READY";
 
+
+}
+
+catch(e){
+
+document.getElementById("ai").innerHTML=
+"Drawing mode ready";
+
+}
 
 }
 
@@ -249,37 +233,32 @@ ctx.fillRect(
 );
 
 
-}
+paths=[];
 
+strokes=[];
 
-
-
-
-async function processImage(){
-
-
-if(!model){
-
-alert("AI still loading");
-
-return;
+drawing=false;
 
 }
 
+
+
+
+// AUTOMATIC IMAGE PROCESS
+
+async function autoProcess(){
 
 
 let file=
 document.getElementById("upload").files[0];
 
 
+if(!file)return;
 
-if(!file){
 
-alert("Upload image");
 
-return;
-
-}
+document.getElementById("ai").innerHTML=
+"🧠 Processing image...";
 
 
 
@@ -287,19 +266,23 @@ let img=new Image();
 
 
 
-img.onload=async function(){
+img.onload=async()=>{
 
+
+
+if(model){
 
 
 let result=
 await model.classify(img);
 
 
-
-document.getElementById("ai")
-.innerHTML=
-"AI sees: "+
+document.getElementById("ai").innerHTML=
+"🤖 AI sees: "+
 result[0].className;
+
+
+}
 
 
 
@@ -307,7 +290,12 @@ createDrawing(img);
 
 
 
-}
+document.getElementById("ai").innerHTML +=
+"<br>✅ READY TO DRAW";
+
+
+
+};
 
 
 
@@ -315,7 +303,9 @@ img.src=
 URL.createObjectURL(file);
 
 
+
 }
+
 
 
 
@@ -334,8 +324,19 @@ temp.height=450;
 
 
 
-let t=
-temp.getContext("2d");
+let t=temp.getContext("2d");
+
+
+
+t.fillStyle="white";
+
+t.fillRect(
+0,
+0,
+700,
+450
+);
+
 
 
 t.drawImage(
@@ -361,8 +362,7 @@ t.getImageData(
 strokes=[];
 
 
-
-let step=
+let detail=
 Number(
 document.getElementById("detail").value
 );
@@ -372,15 +372,16 @@ document.getElementById("detail").value
 for(
 let y=2;
 y<448;
-y+=step
+y+=detail
 ){
 
 
 for(
 let x=2;
 x<698;
-x+=step
+x+=detail
 ){
+
 
 
 let i=
@@ -388,28 +389,27 @@ let i=
 
 
 
-let current=
-(data.data[i]+
+let a=
+(
+data.data[i]+
 data.data[i+1]+
-data.data[i+2])/3;
+data.data[i+2]
+)/3;
 
 
 
-let right=
-(data.data[i+12]+
+let b=
+(
+data.data[i+12]+
 data.data[i+13]+
-data.data[i+14])/3;
+data.data[i+14]
+)/3;
 
 
 
-let edge=
-Math.abs(
-current-right
-);
-
-
-
-if(edge>35){
+if(
+Math.abs(a-b)>35
+){
 
 
 strokes.push({
@@ -425,7 +425,6 @@ y:y
 
 }
 
-
 }
 
 
@@ -433,16 +432,8 @@ y:y
 makePaths();
 
 
-clearScreen();
-
-
-
-alert(
-"AI drawing ready!"
-);
-
-
 }
+
 
 
 
@@ -476,7 +467,8 @@ let last=
 current[current.length-1];
 
 
-let d=
+
+let distance=
 Math.hypot(
 p.x-last.x,
 p.y-last.y
@@ -484,7 +476,7 @@ p.y-last.y
 
 
 
-if(d<40){
+if(distance<40){
 
 current.push(p);
 
@@ -499,9 +491,7 @@ paths.push(current);
 
 current=[p];
 
-
 }
-
 
 
 }
@@ -512,8 +502,8 @@ if(current.length>2)
 paths.push(current);
 
 
-}
 
+}
 
 
 
@@ -526,7 +516,9 @@ async function drawImage(){
 
 if(paths.length===0){
 
-alert("Process image first");
+alert(
+"Upload an image first"
+);
 
 return;
 
@@ -535,6 +527,8 @@ return;
 
 
 drawing=true;
+
+paused=false;
 
 
 
@@ -560,8 +554,7 @@ await wait(100);
 
 
 
-if(!drawing)
-return;
+if(!drawing)return;
 
 
 
@@ -574,10 +567,12 @@ robotY
 );
 
 
+
 ctx.lineTo(
 p.x,
 p.y
 );
+
 
 
 ctx.stroke();
@@ -592,7 +587,7 @@ p.y
 
 
 await wait(
-60-
+100 -
 Number(
 document.getElementById("speed").value
 )
@@ -606,34 +601,12 @@ document.getElementById("speed").value
 }
 
 
+
 drawing=false;
 
 
 }
 
-
-
-
-
-
-function moveRobot(x,y){
-
-robotX=x;
-
-robotY=y;
-
-
-document.getElementById("robot")
-.style.transform=
-
-`
-translate(
-${x/8}px,
-${y/8}px
-)
-`;
-
-}
 
 
 
@@ -653,6 +626,28 @@ function stopDrawing(){
 drawing=false;
 
 paused=false;
+
+}
+
+
+
+
+
+function moveRobot(x,y){
+
+robotX=x;
+
+robotY=y;
+
+
+document.getElementById("robot")
+.style.transform=
+`
+translate(
+${x/8}px,
+${y/8}px
+)
+`;
 
 }
 
@@ -682,6 +677,7 @@ robotY
 ctx.stroke();
 
 
+
 moveRobot(
 robotX,
 robotY
@@ -694,13 +690,14 @@ robotY
 
 
 
-
-
 function saveImage(){
 
 let a=document.createElement("a");
 
-a.download="AI-Etch-Sketch.png";
+
+a.download=
+"AI-Etch-Sketch.png";
+
 
 a.href=
 canvas.toDataURL();
@@ -714,7 +711,6 @@ a.click();
 
 
 
-
 function wait(ms){
 
 return new Promise(
@@ -722,7 +718,6 @@ r=>setTimeout(r,ms)
 );
 
 }
-
 
 
 </script>
